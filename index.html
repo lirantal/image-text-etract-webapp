@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Detection Camera</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Text Detection Camera</h1>
+            <p>Detecting "secret" and "brainrot god" in real-time</p>
+        </header>
+
+        <main>
+            <div class="camera-section">
+                <div class="video-container">
+                    <video id="video" autoplay muted playsinline></video>
+                    <canvas id="canvas" style="display: none;"></canvas>
+                    <div class="overlay">
+                        <div class="status" id="status">Camera not started</div>
+                        <div class="detection-box" id="detection-box"></div>
+                    </div>
+                </div>
+                
+                <div class="controls">
+                    <button id="startBtn" class="btn btn-primary">Start Camera</button>
+                    <button id="stopBtn" class="btn btn-secondary" disabled>Stop Camera</button>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <div class="detection-log">
+                    <h3>Detection Log</h3>
+                    <div id="log" class="log-content"></div>
+                </div>
+                
+                <div class="settings">
+                    <h3>Settings</h3>
+                    <div class="setting-item">
+                        <label for="confidence">Confidence Threshold:</label>
+                        <input type="range" id="confidence" min="0.1" max="1" step="0.1" value="0.7">
+                        <span id="confidenceValue">0.7</span>
+                    </div>
+                    <div class="setting-item">
+                        <label for="interval">Detection Interval (ms):</label>
+                        <input type="number" id="interval" min="100" max="2000" step="100" value="500">
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div id="alarm" class="alarm hidden">
+            <div class="alarm-content">
+                <h2>🚨 ALERT! 🚨</h2>
+                <p id="alarm-text">Target text detected!</p>
+                <button id="dismissAlarm" class="btn btn-danger">Dismiss</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+    <!-- TensorFlow.js Text Recognition -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+    <!-- Tesseract.js for OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
+    
+    <script src="script.js"></script>
+</body>
+</html> 
