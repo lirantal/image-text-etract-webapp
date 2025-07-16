@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Detection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-text {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            padding: 20px;
+            margin: 10px 0;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+        }
+        .target {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .colored {
+            background: linear-gradient(45deg, #ff9ff3, #54a0ff);
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .small {
+            font-size: 16px;
+        }
+        .large {
+            font-size: 32px;
+        }
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .instructions {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Text Detection Test Page</h1>
+    
+    <div class="instructions">
+        <h3>How to Test:</h3>
+        <ol>
+            <li>Open the main application at <a href="index.html">index.html</a></li>
+            <li>Start the camera</li>
+            <li>Point the camera at the test texts below</li>
+            <li>Watch the detection log for results</li>
+            <li>Try different distances and angles</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Target Phrases (Should Trigger Alarm)</h2>
+        
+        <div class="test-text target">
+            secret
+        </div>
+        
+        <div class="test-text target">
+            god
+        </div>
+        
+        <div class="test-text target">
+            rare
+        </div>
+        
+        <div class="test-text target">
+            epic
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🌈 Colored Text (Common in Games)</h2>
+        
+        <div class="test-text colored">
+            RARE
+        </div>
+        
+        <div class="test-text colored">
+            EPIC
+        </div>
+        
+        <div class="test-text colored">
+            SECRET
+        </div>
+        
+        <div class="test-text colored">
+            GOD
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📏 Different Sizes</h2>
+        
+        <div class="test-text target small">
+            rare
+        </div>
+        
+        <div class="test-text target large">
+            epic
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔤 Similar Words (Should NOT Trigger)</h2>
+        
+        <div class="test-text">
+            scare
+        </div>
+        
+        <div class="test-text">
+            good
+        </div>
+        
+        <div class="test-text">
+            rate
+        </div>
+        
+        <div class="test-text">
+            echo
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📱 Mobile-Friendly Test</h2>
+        <p>Try viewing this page on your phone and pointing the camera at it from different angles and distances.</p>
+        
+        <div class="test-text target">
+            RARE EPIC
+        </div>
+        
+        <div class="test-text colored">
+            SECRET GOD
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>💡 Tips for Better Detection</h2>
+        <ul>
+            <li><strong>Good Lighting:</strong> Ensure the text is well-lit</li>
+            <li><strong>Stable Camera:</strong> Hold the camera steady</li>
+            <li><strong>Proper Distance:</strong> Not too close, not too far</li>
+            <li><strong>Clear Background:</strong> Avoid cluttered backgrounds</li>
+            <li><strong>Text Orientation:</strong> Keep text horizontal</li>
+            <li><strong>Debug Mode:</strong> Enable debug mode to see processing details</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>⚙️ Performance Settings</h2>
+        <p>In the main application, try adjusting these settings:</p>
+        <ul>
+            <li><strong>Detection Interval:</strong> Lower values (100-200ms) for faster response</li>
+            <li><strong>Confidence Threshold:</strong> Lower values (0.3-0.5) for more sensitive detection</li>
+            <li><strong>Debug Mode:</strong> Enable to see detailed processing information</li>
+        </ul>
+    </div>
+</body>
+</html> 

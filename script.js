@@ -17,6 +17,14 @@ class TextDetectionCamera {
         this.confidenceValue = document.getElementById('confidenceValue');
         this.intervalInput = document.getElementById('interval');
         
+        // Snapshot elements
+        this.snapshotsContainer = document.getElementById('snapshots');
+        this.clearSnapshotsBtn = document.getElementById('clearSnapshots');
+        this.saveSnapshotsCheckbox = document.getElementById('saveSnapshots');
+        this.saveTextSnapshotsCheckbox = document.getElementById('saveTextSnapshots');
+        this.debugModeCheckbox = document.getElementById('debugMode');
+        this.testDetectionBtn = document.getElementById('testDetection');
+        
         this.stream = null;
         this.detectionInterval = null;
         this.worker = null;
@@ -27,7 +35,10 @@ class TextDetectionCamera {
         
         // Settings
         this.confidenceThreshold = 0.7;
-        this.detectionIntervalMs = 50;
+        this.detectionIntervalMs = 850;
+        
+        // Debug flag
+        this.debugMode = false;
         
         this.initializeEventListeners();
         this.initializeTesseract();
@@ -49,6 +60,15 @@ class TextDetectionCamera {
                 this.restartDetection();
             }
         });
+        
+        this.clearSnapshotsBtn.addEventListener('click', () => this.clearSnapshots());
+        
+        this.debugModeCheckbox.addEventListener('change', (e) => {
+            this.debugMode = e.target.checked;
+            this.logMessage(`Debug mode ${this.debugMode ? 'enabled' : 'disabled'}`, 'info');
+        });
+        
+        this.testDetectionBtn.addEventListener('click', () => this.testDetectionStatus());
     }
     
     async initializeTesseract() {
@@ -58,7 +78,8 @@ class TextDetectionCamera {
             await this.worker.loadLanguage('eng');
             await this.worker.initialize('eng');
             await this.worker.setParameters({
-                tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
+                // tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
+                tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ',
             });
             this.logMessage('Tesseract.js initialized successfully!', 'success');
         } catch (error) {
@@ -116,6 +137,11 @@ class TextDetectionCamera {
         this.status.textContent = 'Camera stopped';
         this.detectionBox.style.display = 'none';
         this.logMessage('Camera stopped', 'info');
+        
+        // Debug: Log that detection should be stopped
+        if (this.debugMode) {
+            this.logMessage('Detection interval cleared, isRunning set to false', 'info');
+        }
     }
     
     startDetection() {
@@ -146,9 +172,36 @@ class TextDetectionCamera {
     async detectText() {
         if (!this.isRunning || !this.worker) return;
         
+        // Additional check to ensure video is actually playing
+        if (!this.video.srcObject || this.video.readyState < 2) {
+            return;
+        }
+        
+        // Check if canvas has valid dimensions
+        if (this.canvas.width === 0 || this.canvas.height === 0) {
+            return;
+        }
+        
+        // Debug: Log when detection is actually running
+        if (this.debugMode) {
+            this.logMessage(`Detection cycle running - Video readyState: ${this.video.readyState}`, 'info');
+        }
+        
         try {
-            // Capture current frame
-            this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+            // Capture current frame - add error handling for drawImage
+            try {
+                this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+            } catch (drawError) {
+                if (this.debugMode) {
+                    this.logMessage(`Failed to draw video frame: ${drawError.message}`, 'error');
+                }
+                return;
+            }
+            
+            // Save snapshot if enabled
+            if (this.saveSnapshotsCheckbox.checked) {
+                this.saveSnapshot();
+            }
             
             // Perform OCR
             const result = await this.worker.recognize(this.canvas);
@@ -157,6 +210,11 @@ class TextDetectionCamera {
             if (detectedText) {
                 this.logMessage(`Detected: "${detectedText}"`, 'info');
                 
+                // Save text snapshot if enabled and no regular snapshot was saved
+                if (this.saveTextSnapshotsCheckbox.checked && !this.saveSnapshotsCheckbox.checked) {
+                    this.saveSnapshot();
+                }
+                
                 // Check for target phrases
                 const foundPhrases = this.targetPhrases.filter(phrase => 
                     detectedText.includes(phrase.toLowerCase())
@@ -164,13 +222,93 @@ class TextDetectionCamera {
                 
                 if (foundPhrases.length > 0) {
                     this.triggerAlarm(foundPhrases[0]);
-                    this.showDetectionBox(result.data.words);
+                    // No need to show the detection box because we are already triggering the alarm
+                    // this.showDetectionBox(result.data.words);
                 }
+                
+                // Update the latest snapshot with detected text
+                this.updateLatestSnapshotText(detectedText, foundPhrases.length > 0);
             }
             
         } catch (error) {
             this.logMessage(`Detection error: ${error.message}`, 'error');
         }
+    }
+    
+    saveSnapshot() {
+        try {
+            // Don't save if video is not active
+            if (!this.isRunning || !this.video.srcObject) {
+                return;
+            }
+            
+            // Create a data URL from the canvas
+            const dataUrl = this.canvas.toDataURL('image/jpeg', 0.8);
+            
+            // Create snapshot item
+            const snapshotItem = document.createElement('div');
+            snapshotItem.className = 'snapshot-item';
+            
+            const timestamp = new Date().toLocaleTimeString();
+            const frameInfo = `${this.canvas.width}x${this.canvas.height}`;
+            
+            snapshotItem.innerHTML = `
+                <img src="${dataUrl}" alt="Snapshot at ${timestamp}">
+                <div class="snapshot-info">${timestamp} | ${frameInfo}</div>
+                <div class="snapshot-text" style="display: none;">No text detected</div>
+            `;
+            
+            // Add to container (at the beginning to show newest first)
+            this.snapshotsContainer.insertBefore(snapshotItem, this.snapshotsContainer.firstChild);
+            
+            // Keep only last 20 snapshots to prevent memory issues
+            while (this.snapshotsContainer.children.length > 20) {
+                this.snapshotsContainer.removeChild(this.snapshotsContainer.lastChild);
+            }
+            
+            // Store reference to latest snapshot for text updates
+            this.latestSnapshot = snapshotItem;
+            
+        } catch (error) {
+            this.logMessage(`Failed to save snapshot: ${error.message}`, 'error');
+        }
+    }
+    
+    updateLatestSnapshotText(detectedText, hasTargetPhrase = false) {
+        if (this.latestSnapshot) {
+            const textElement = this.latestSnapshot.querySelector('.snapshot-text');
+            if (textElement) {
+                textElement.textContent = detectedText;
+                textElement.style.display = 'block';
+                
+                // Highlight if target phrase was found
+                if (hasTargetPhrase) {
+                    this.latestSnapshot.style.borderColor = '#dc3545';
+                    this.latestSnapshot.style.backgroundColor = '#fff5f5';
+                    textElement.style.backgroundColor = '#dc3545';
+                    textElement.style.color = 'white';
+                }
+            }
+        }
+    }
+    
+    clearSnapshots() {
+        this.snapshotsContainer.innerHTML = '';
+        this.latestSnapshot = null;
+        this.logMessage('Snapshots cleared', 'info');
+    }
+    
+    testDetectionStatus() {
+        const status = {
+            isRunning: this.isRunning,
+            hasWorker: !!this.worker,
+            hasVideoStream: !!this.video.srcObject,
+            videoReadyState: this.video.readyState,
+            canvasDimensions: `${this.canvas.width}x${this.canvas.height}`,
+            hasDetectionInterval: !!this.detectionInterval
+        };
+        
+        this.logMessage(`Detection Status: ${JSON.stringify(status, null, 2)}`, 'info');
     }
     
     showDetectionBox(words) {
