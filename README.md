@@ -84,7 +84,7 @@ Then navigate to `http://localhost:8000` in your browser.
 - **HTML5**: Structure and video elements
 - **CSS3**: Styling and animations
 - **JavaScript (ES6+)**: Core functionality
-- **Tesseract.js**: OCR engine for text recognition
+- **Tesseract.js 6.0.1**: OCR engine for text recognition
 - **Web Audio API**: Audio alarm generation
 - **MediaDevices API**: Camera access
 

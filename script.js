@@ -34,8 +34,8 @@ class TextDetectionCamera {
         this.targetPhrases = ['secret', 'god', 'rare', 'epic'];
         
         // Settings
-        this.confidenceThreshold = 0.7;
-        this.detectionIntervalMs = 850;
+        this.confidenceThreshold = 0.4;
+        this.detectionIntervalMs = 450;
         
         // Debug flag
         this.debugMode = false;
@@ -46,7 +46,9 @@ class TextDetectionCamera {
     
     initializeEventListeners() {
         this.startBtn.addEventListener('click', () => this.startCamera());
-        this.stopBtn.addEventListener('click', () => this.stopCamera());
+        this.stopBtn.addEventListener('click', () => this.stopCamera().catch(error => {
+            this.logMessage(`Error stopping camera: ${error.message}`, 'error');
+        }));
         this.dismissAlarmBtn.addEventListener('click', () => this.dismissAlarm());
         
         this.confidenceSlider.addEventListener('input', (e) => {
@@ -74,13 +76,11 @@ class TextDetectionCamera {
     async initializeTesseract() {
         try {
             this.logMessage('Initializing Tesseract.js...', 'info');
-            this.worker = await Tesseract.createWorker();
-            await this.worker.loadLanguage('eng');
-            await this.worker.initialize('eng');
-            await this.worker.setParameters({
-                // tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
-                tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ',
-            });
+            
+            // Use the new Tesseract.js 6.0.1 createWorker API
+            const { createWorker } = Tesseract;
+            this.worker = await createWorker('eng', 1);
+            
             this.logMessage('Tesseract.js initialized successfully!', 'success');
         } catch (error) {
             this.logMessage(`Failed to initialize Tesseract: ${error.message}`, 'error');
@@ -119,7 +119,7 @@ class TextDetectionCamera {
         }
     }
     
-    stopCamera() {
+    async stopCamera() {
         if (this.stream) {
             this.stream.getTracks().forEach(track => track.stop());
             this.stream = null;
@@ -137,6 +137,17 @@ class TextDetectionCamera {
         this.status.textContent = 'Camera stopped';
         this.detectionBox.style.display = 'none';
         this.logMessage('Camera stopped', 'info');
+        
+        // Terminate the Tesseract worker to free up resources
+        if (this.worker) {
+            try {
+                await this.worker.terminate();
+                this.worker = null;
+                this.logMessage('Tesseract worker terminated', 'info');
+            } catch (error) {
+                this.logMessage(`Error terminating worker: ${error.message}`, 'error');
+            }
+        }
         
         // Debug: Log that detection should be stopped
         if (this.debugMode) {
@@ -203,9 +214,14 @@ class TextDetectionCamera {
                 this.saveSnapshot();
             }
             
-            // Perform OCR
-            const result = await this.worker.recognize(this.canvas);
-            const detectedText = result.data.text.toLowerCase().trim();
+            // Perform OCR using new Tesseract.js 6.0.1 worker API
+            const { data: { text } } = await this.worker.recognize(this.canvas);
+            const detectedText = text.toLowerCase().trim();
+            
+            // Debug: Log the result structure to understand the new API
+            if (this.debugMode) {
+                this.logMessage(`OCR Result: "${text}"`, 'info');
+            }
             
             if (detectedText) {
                 this.logMessage(`Detected: "${detectedText}"`, 'info');
@@ -228,6 +244,11 @@ class TextDetectionCamera {
                 
                 // Update the latest snapshot with detected text
                 this.updateLatestSnapshotText(detectedText, foundPhrases.length > 0);
+            } else {
+                // Log when no text is detected for debugging
+                if (this.debugMode) {
+                    this.logMessage('No text detected in this frame', 'info');
+                }
             }
             
         } catch (error) {
@@ -302,6 +323,7 @@ class TextDetectionCamera {
         const status = {
             isRunning: this.isRunning,
             hasWorker: !!this.worker,
+            workerType: this.worker ? 'Tesseract.js 6.0.1 Worker' : 'None',
             hasVideoStream: !!this.video.srcObject,
             videoReadyState: this.video.readyState,
             canvasDimensions: `${this.canvas.width}x${this.canvas.height}`,
