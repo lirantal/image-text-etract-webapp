@@ -216,6 +216,26 @@ main {
     border-radius: 4px;
 }
 
+.setting-item input[type="text"] {
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: monospace;
+}
+
+.whitelist-presets {
+    margin-top: 10px;
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.whitelist-presets .btn {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+    min-width: auto;
+}
+
 .alarm {
     position: fixed;
     top: 0;

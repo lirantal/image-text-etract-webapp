@@ -47,6 +47,9 @@
                             <input type="checkbox" id="saveTextSnapshots" checked> Save Text Snapshots
                         </label>
                         <label>
+                            <input type="checkbox" id="savePreprocessed"> Save Preprocessed
+                        </label>
+                        <label>
                             <input type="checkbox" id="debugMode"> Debug Mode
                         </label>
                         <button id="testDetection" class="btn btn-secondary">Test Detection Status</button>
@@ -64,6 +67,17 @@
                     <div class="setting-item">
                         <label for="interval">Detection Interval (ms):</label>
                         <input type="number" id="interval" min="100" max="2000" step="100" value="450">
+                    </div>
+                    <div class="setting-item">
+                        <label for="whitelist">Character Whitelist:</label>
+                        <input type="text" id="whitelist" value="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 " style="width: 300px;">
+                        <div class="whitelist-presets">
+                            <button class="btn btn-secondary" onclick="setWhitelist('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ')">Standard</button>
+                            <button class="btn btn-secondary" onclick="setWhitelist('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ')">Letters Only</button>
+                            <button class="btn btn-secondary" onclick="setWhitelist('ABCDEFGHIJKLMNOPQRSTUVWXYZ ')">Uppercase Only</button>
+                            <button class="btn btn-secondary" onclick="setWhitelist('abcdefghijklmnopqrstuvwxyz ')">Lowercase Only</button>
+                            <button class="btn btn-secondary" onclick="setWhitelist('ABCDEFGHIJKLMNOPQRSTUVWXYZ ')">Game Text (Uppercase)</button>
+                        </div>
                     </div>
                 </div>
             </div>

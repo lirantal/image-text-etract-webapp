@@ -22,8 +22,10 @@ class TextDetectionCamera {
         this.clearSnapshotsBtn = document.getElementById('clearSnapshots');
         this.saveSnapshotsCheckbox = document.getElementById('saveSnapshots');
         this.saveTextSnapshotsCheckbox = document.getElementById('saveTextSnapshots');
+        this.savePreprocessedCheckbox = document.getElementById('savePreprocessed');
         this.debugModeCheckbox = document.getElementById('debugMode');
         this.testDetectionBtn = document.getElementById('testDetection');
+        this.whitelistInput = document.getElementById('whitelist');
         
         this.stream = null;
         this.detectionInterval = null;
@@ -32,6 +34,9 @@ class TextDetectionCamera {
         
         // Target phrases to detect
         this.targetPhrases = ['secret', 'god', 'rare', 'epic'];
+        
+        // Character whitelist optimized for target phrases
+        this.characterWhitelist = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ';
         
         // Settings
         this.confidenceThreshold = 0.4;
@@ -68,6 +73,11 @@ class TextDetectionCamera {
         this.debugModeCheckbox.addEventListener('change', (e) => {
             this.debugMode = e.target.checked;
             this.logMessage(`Debug mode ${this.debugMode ? 'enabled' : 'disabled'}`, 'info');
+        });
+        
+        this.whitelistInput.addEventListener('input', (e) => {
+            this.characterWhitelist = e.target.value;
+            this.logMessage(`Character whitelist updated: "${e.target.value}"`, 'info');
         });
         
         this.testDetectionBtn.addEventListener('click', () => this.testDetectionStatus());
@@ -209,13 +219,29 @@ class TextDetectionCamera {
                 return;
             }
             
+            // Preprocess the image for better OCR accuracy
+            const processedCanvas = this.preprocessImageForOCR(this.canvas);
+            
             // Save snapshot if enabled
             if (this.saveSnapshotsCheckbox.checked) {
                 this.saveSnapshot();
             }
             
-            // Perform OCR using new Tesseract.js 6.0.1 worker API
-            const { data: { text } } = await this.worker.recognize(this.canvas);
+            // Save preprocessed snapshot if enabled
+            if (this.savePreprocessedCheckbox.checked) {
+                this.saveSnapshot(processedCanvas, 'Preprocessed');
+            }
+            
+            // Perform OCR using new Tesseract.js 6.0.1 worker API with optimized configuration
+            const { data: { text } } = await this.worker.recognize(processedCanvas, {
+                tessedit_char_whitelist: this.characterWhitelist,
+                preserve_interword_spaces: 1,
+                tessedit_pageseg_mode: 6, // Uniform block of text
+                tessedit_ocr_engine_mode: 3, // Default, based on what is available
+                textord_heavy_nr: 1, // Heavy noise removal
+                textord_min_linesize: 2.0, // Minimum line size
+                tessedit_do_invert: 0 // Don't invert colors
+            });
             const detectedText = text.toLowerCase().trim();
             
             // Debug: Log the result structure to understand the new API
@@ -256,26 +282,27 @@ class TextDetectionCamera {
         }
     }
     
-    saveSnapshot() {
+    saveSnapshot(canvas = this.canvas, label = '') {
         try {
             // Don't save if video is not active
             if (!this.isRunning || !this.video.srcObject) {
                 return;
             }
             
-            // Create a data URL from the canvas
-            const dataUrl = this.canvas.toDataURL('image/jpeg', 0.8);
+            // Create a data URL from the provided canvas
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
             
             // Create snapshot item
             const snapshotItem = document.createElement('div');
             snapshotItem.className = 'snapshot-item';
             
             const timestamp = new Date().toLocaleTimeString();
-            const frameInfo = `${this.canvas.width}x${this.canvas.height}`;
+            const frameInfo = `${canvas.width}x${canvas.height}`;
+            const snapshotLabel = label ? ` (${label})` : '';
             
             snapshotItem.innerHTML = `
                 <img src="${dataUrl}" alt="Snapshot at ${timestamp}">
-                <div class="snapshot-info">${timestamp} | ${frameInfo}</div>
+                <div class="snapshot-info">${timestamp}${snapshotLabel} | ${frameInfo}</div>
                 <div class="snapshot-text" style="display: none;">No text detected</div>
             `;
             
@@ -317,6 +344,89 @@ class TextDetectionCamera {
         this.snapshotsContainer.innerHTML = '';
         this.latestSnapshot = null;
         this.logMessage('Snapshots cleared', 'info');
+    }
+    
+    preprocessImageForOCR(sourceCanvas) {
+        // Create a new canvas for preprocessing
+        const processedCanvas = document.createElement('canvas');
+        const ctx = processedCanvas.getContext('2d');
+        
+        processedCanvas.width = sourceCanvas.width;
+        processedCanvas.height = sourceCanvas.height;
+        
+        // Step 1: Convert to grayscale
+        ctx.filter = "grayscale(100%)";
+        ctx.drawImage(sourceCanvas, 0, 0);
+        
+        // Step 2: Increase contrast and brightness for better text separation
+        ctx.filter = "contrast(200%) brightness(110%)";
+        ctx.drawImage(processedCanvas, 0, 0);
+        
+        // Step 3: Apply manual contrast enhancement and adaptive thresholding
+        const imageData = ctx.getImageData(0, 0, processedCanvas.width, processedCanvas.height);
+        const data = imageData.data;
+        
+        // Calculate local mean for adaptive thresholding
+        const windowSize = 15;
+        const localMeans = this.calculateLocalMeans(data, processedCanvas.width, processedCanvas.height, windowSize);
+        
+        // Apply adaptive thresholding and contrast enhancement
+        for (let i = 0; i < data.length; i += 4) {
+            const gray = data[i]; // All channels are the same after grayscale
+            const pixelIndex = i / 4;
+            const localMean = localMeans[pixelIndex] || 128;
+            
+            // Adaptive thresholding based on local mean
+            const threshold = localMean * 0.8; // Slightly below local mean
+            const enhanced = gray > threshold ? 255 : 0;
+            
+            data[i] = enhanced;     // Red
+            data[i + 1] = enhanced; // Green
+            data[i + 2] = enhanced; // Blue
+            // Alpha remains unchanged
+        }
+        
+        // Step 4: Apply morphological operations to clean up text
+        ctx.putImageData(imageData, 0, 0);
+        
+        // Step 5: Apply slight blur to reduce noise, then sharpen
+        ctx.filter = "blur(0.5px)";
+        ctx.drawImage(processedCanvas, 0, 0);
+        
+        // Step 6: Final sharpening and contrast boost
+        ctx.filter = "contrast(150%) saturate(0%)";
+        ctx.drawImage(processedCanvas, 0, 0);
+        
+        // Reset filter
+        ctx.filter = "none";
+        
+        return processedCanvas;
+    }
+    
+    calculateLocalMeans(data, width, height, windowSize) {
+        const means = [];
+        const halfWindow = Math.floor(windowSize / 2);
+        
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                let sum = 0;
+                let count = 0;
+                
+                // Calculate mean in local window
+                for (let wy = Math.max(0, y - halfWindow); wy < Math.min(height, y + halfWindow + 1); wy++) {
+                    for (let wx = Math.max(0, x - halfWindow); wx < Math.min(width, x + halfWindow + 1); wx++) {
+                        const index = (wy * width + wx) * 4;
+                        sum += data[index];
+                        count++;
+                    }
+                }
+                
+                const pixelIndex = y * width + x;
+                means[pixelIndex] = count > 0 ? sum / count : 128;
+            }
+        }
+        
+        return means;
     }
     
     testDetectionStatus() {
@@ -417,6 +527,13 @@ class TextDetectionCamera {
             this.log.removeChild(this.log.firstChild);
         }
     }
+}
+
+// Global function for whitelist presets
+function setWhitelist(whitelist) {
+    const input = document.getElementById('whitelist');
+    input.value = whitelist;
+    input.dispatchEvent(new Event('input'));
 }
 
 // Initialize the application when the page loads
