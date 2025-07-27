@@ -236,6 +236,18 @@ main {
     min-width: auto;
 }
 
+.zone-controls {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.zone-controls input {
+    text-align: center;
+    font-family: monospace;
+}
+
 .alarm {
     position: fixed;
     top: 0;

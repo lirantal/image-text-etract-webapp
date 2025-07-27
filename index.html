@@ -52,6 +52,9 @@
                         <label>
                             <input type="checkbox" id="debugMode"> Debug Mode
                         </label>
+                        <label>
+                            <input type="checkbox" id="showZoneIndicator" checked> Show Zone Indicator
+                        </label>
                         <button id="testDetection" class="btn btn-secondary">Test Detection Status</button>
                     </div>
                     <div id="snapshots" class="snapshots-grid"></div>
@@ -77,6 +80,16 @@
                             <button class="btn btn-secondary" onclick="setWhitelist('ABCDEFGHIJKLMNOPQRSTUVWXYZ ')">Uppercase Only</button>
                             <button class="btn btn-secondary" onclick="setWhitelist('abcdefghijklmnopqrstuvwxyz ')">Lowercase Only</button>
                             <button class="btn btn-secondary" onclick="setWhitelist('ABCDEFGHIJKLMNOPQRSTUVWXYZ ')">Game Text (Uppercase)</button>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <label>Rarity Zone (X, Y, Width, Height):</label>
+                        <div class="zone-controls">
+                            <input type="number" id="zoneX" value="500" min="0" max="1000" step="5" style="width: 60px;" placeholder="X">
+                            <input type="number" id="zoneY" value="125" min="0" max="1000" step="5" style="width: 60px;" placeholder="Y">
+                            <input type="number" id="zoneWidth" value="550" min="10" max="500" step="10" style="width: 60px;" placeholder="W">
+                            <input type="number" id="zoneHeight" value="400" min="10" max="200" step="5" style="width: 60px;" placeholder="H">
+                            <button class="btn btn-secondary" onclick="updateRarityZone()">Update Zone</button>
                         </div>
                     </div>
                 </div>

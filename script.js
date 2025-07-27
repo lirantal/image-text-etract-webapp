@@ -24,8 +24,13 @@ class TextDetectionCamera {
         this.saveTextSnapshotsCheckbox = document.getElementById('saveTextSnapshots');
         this.savePreprocessedCheckbox = document.getElementById('savePreprocessed');
         this.debugModeCheckbox = document.getElementById('debugMode');
+        this.showZoneIndicatorCheckbox = document.getElementById('showZoneIndicator');
         this.testDetectionBtn = document.getElementById('testDetection');
         this.whitelistInput = document.getElementById('whitelist');
+        this.zoneXInput = document.getElementById('zoneX');
+        this.zoneYInput = document.getElementById('zoneY');
+        this.zoneWidthInput = document.getElementById('zoneWidth');
+        this.zoneHeightInput = document.getElementById('zoneHeight');
         
         this.stream = null;
         this.detectionInterval = null;
@@ -37,6 +42,14 @@ class TextDetectionCamera {
         
         // Character whitelist optimized for target phrases
         this.characterWhitelist = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ';
+        
+        // Zone cropping configuration for rarity text detection
+        this.rarityZone = {
+            x: 500,      // X position of rarity text zone
+            y: 125,     // Y position of rarity text zone  
+            width: 550, // Width of rarity text zone
+            height: 400  // Height of rarity text zone
+        };
         
         // Settings
         this.confidenceThreshold = 0.4;
@@ -75,10 +88,24 @@ class TextDetectionCamera {
             this.logMessage(`Debug mode ${this.debugMode ? 'enabled' : 'disabled'}`, 'info');
         });
         
+        this.showZoneIndicatorCheckbox.addEventListener('change', (e) => {
+            const indicator = document.getElementById('rarity-zone-indicator');
+            if (indicator) {
+                indicator.style.display = e.target.checked ? 'block' : 'none';
+            }
+            this.logMessage(`Zone indicator ${e.target.checked ? 'shown' : 'hidden'}`, 'info');
+        });
+        
         this.whitelistInput.addEventListener('input', (e) => {
             this.characterWhitelist = e.target.value;
             this.logMessage(`Character whitelist updated: "${e.target.value}"`, 'info');
         });
+        
+        // Zone control event listeners
+        this.zoneXInput.addEventListener('change', () => this.updateRarityZoneFromInputs());
+        this.zoneYInput.addEventListener('change', () => this.updateRarityZoneFromInputs());
+        this.zoneWidthInput.addEventListener('change', () => this.updateRarityZoneFromInputs());
+        this.zoneHeightInput.addEventListener('change', () => this.updateRarityZoneFromInputs());
         
         this.testDetectionBtn.addEventListener('click', () => this.testDetectionStatus());
     }
@@ -146,6 +173,13 @@ class TextDetectionCamera {
         this.stopBtn.disabled = true;
         this.status.textContent = 'Camera stopped';
         this.detectionBox.style.display = 'none';
+        
+        // Hide rarity zone indicator
+        const indicator = document.getElementById('rarity-zone-indicator');
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
+        
         this.logMessage('Camera stopped', 'info');
         
         // Terminate the Tesseract worker to free up resources
@@ -219,8 +253,11 @@ class TextDetectionCamera {
                 return;
             }
             
-            // Preprocess the image for better OCR accuracy
-            const processedCanvas = this.preprocessImageForOCR(this.canvas);
+            // Crop to rarity zone for targeted detection
+            const croppedCanvas = this.cropRarityZone(this.canvas);
+            
+            // Preprocess the cropped image for better OCR accuracy
+            const processedCanvas = this.preprocessImageForOCR(croppedCanvas);
             
             // Save snapshot if enabled
             if (this.saveSnapshotsCheckbox.checked) {
@@ -232,15 +269,20 @@ class TextDetectionCamera {
                 this.saveSnapshot(processedCanvas, 'Preprocessed');
             }
             
-            // Perform OCR using new Tesseract.js 6.0.1 worker API with optimized configuration
+            // Perform OCR using new Tesseract.js 6.0.1 worker API with aggressive single-word configuration
             const { data: { text } } = await this.worker.recognize(processedCanvas, {
                 tessedit_char_whitelist: this.characterWhitelist,
-                preserve_interword_spaces: 1,
-                tessedit_pageseg_mode: 6, // Uniform block of text
-                tessedit_ocr_engine_mode: 3, // Default, based on what is available
+                preserve_interword_spaces: 0, // No spaces for single words
+                tessedit_pageseg_mode: 7, // Treat as single text line
+                tessedit_ocr_engine_mode: 3, // Default engine
                 textord_heavy_nr: 1, // Heavy noise removal
-                textord_min_linesize: 2.0, // Minimum line size
-                tessedit_do_invert: 0 // Don't invert colors
+                textord_min_linesize: 1.5, // Lower minimum line size for single words
+                tessedit_do_invert: 0, // Don't invert colors
+                classify_bln_numeric_mode: 0, // Disable numeric mode for letters only
+                textord_old_baselines: 0, // Use new baseline detection
+                textord_min_xheight: 8, // Minimum character height
+                textord_heavy_nr: 1, // Heavy noise removal
+                textord_min_linesize: 1.5 // Lower minimum line size
             });
             const detectedText = text.toLowerCase().trim();
             
@@ -346,6 +388,65 @@ class TextDetectionCamera {
         this.logMessage('Snapshots cleared', 'info');
     }
     
+    cropRarityZone(canvas) {
+        const croppedCanvas = document.createElement('canvas');
+        const ctx = croppedCanvas.getContext('2d');
+        
+        // Set canvas size to match target zone
+        croppedCanvas.width = this.rarityZone.width;
+        croppedCanvas.height = this.rarityZone.height;
+        
+        // Draw only the rarity area
+        ctx.drawImage(
+            canvas, 
+            this.rarityZone.x, this.rarityZone.y, this.rarityZone.width, this.rarityZone.height,
+            0, 0, this.rarityZone.width, this.rarityZone.height
+        );
+        
+        // Show visual indicator of the rarity zone on the video
+        this.showRarityZoneIndicator();
+        
+        if (this.debugMode) {
+            console.log(`Cropped rarity zone: ${this.rarityZone.x},${this.rarityZone.y} ${this.rarityZone.width}x${this.rarityZone.height}`);
+        }
+        
+        return croppedCanvas;
+    }
+    
+    showRarityZoneIndicator() {
+        // Only show if checkbox is checked
+        if (!this.showZoneIndicatorCheckbox.checked) {
+            return;
+        }
+        
+        // Create or update the rarity zone indicator
+        let indicator = document.getElementById('rarity-zone-indicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'rarity-zone-indicator';
+            indicator.style.cssText = `
+                position: absolute;
+                border: 2px solid #ff6b6b;
+                background: rgba(255, 107, 107, 0.1);
+                pointer-events: none;
+                z-index: 10;
+                transition: all 0.3s ease;
+            `;
+            this.video.parentElement.appendChild(indicator);
+        }
+        
+        // Calculate position relative to video
+        const videoRect = this.video.getBoundingClientRect();
+        const scaleX = videoRect.width / this.canvas.width;
+        const scaleY = videoRect.height / this.canvas.height;
+        
+        indicator.style.left = `${this.rarityZone.x * scaleX}px`;
+        indicator.style.top = `${this.rarityZone.y * scaleY}px`;
+        indicator.style.width = `${this.rarityZone.width * scaleX}px`;
+        indicator.style.height = `${this.rarityZone.height * scaleY}px`;
+        indicator.style.display = 'block';
+    }
+    
     preprocessImageForOCR(sourceCanvas) {
         // Create a new canvas for preprocessing
         const processedCanvas = document.createElement('canvas');
@@ -429,6 +530,15 @@ class TextDetectionCamera {
         return means;
     }
     
+    updateRarityZoneFromInputs() {
+        this.rarityZone.x = parseInt(this.zoneXInput.value) || 90;
+        this.rarityZone.y = parseInt(this.zoneYInput.value) || 130;
+        this.rarityZone.width = parseInt(this.zoneWidthInput.value) || 200;
+        this.rarityZone.height = parseInt(this.zoneHeightInput.value) || 50;
+        
+        this.logMessage(`Rarity zone updated: ${this.rarityZone.x},${this.rarityZone.y} ${this.rarityZone.width}x${this.rarityZone.height}`, 'info');
+    }
+    
     testDetectionStatus() {
         const status = {
             isRunning: this.isRunning,
@@ -437,7 +547,8 @@ class TextDetectionCamera {
             hasVideoStream: !!this.video.srcObject,
             videoReadyState: this.video.readyState,
             canvasDimensions: `${this.canvas.width}x${this.canvas.height}`,
-            hasDetectionInterval: !!this.detectionInterval
+            hasDetectionInterval: !!this.detectionInterval,
+            rarityZone: this.rarityZone
         };
         
         this.logMessage(`Detection Status: ${JSON.stringify(status, null, 2)}`, 'info');
@@ -536,7 +647,14 @@ function setWhitelist(whitelist) {
     input.dispatchEvent(new Event('input'));
 }
 
+// Global function for updating rarity zone
+function updateRarityZone() {
+    if (window.textDetectionCamera) {
+        window.textDetectionCamera.updateRarityZoneFromInputs();
+    }
+}
+
 // Initialize the application when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    new TextDetectionCamera();
+    window.textDetectionCamera = new TextDetectionCamera();
 }); 
